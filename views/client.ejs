@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+    <meta charset="utf-8">
+    <title>ChatApp</title>
+</head>
+
+<body class="chat">
+    <table>
+        <tr>
+            <td><button onclick="clicked(0,0)">O</button></td>
+            <td><button onclick="clicked(0,1)">O</button></td>
+            <td><button onclick="clicked(0,2)">O</button></td>
+        </tr>
+        <tr>
+            <td><button onclick="clicked(1,0)">O</button></td>
+            <td><button onclick="clicked(1,1)">O</button></td>
+            <td><button onclick="clicked(1,2)">O</button></td>
+        </tr>
+        <tr>
+            <td><button onclick="clicked(2,0)">O</button></td>
+            <td><button onclick="clicked(2,1)">O</button></td>
+            <td><button onclick="clicked(2,2)">O</button></td>
+        </tr>
+    </table>
+    <p id="temp">
+
+    </p>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var socket = io();
+
+        characters = {
+            0:".",
+            1:"X",
+            2:"O",
+        };
+
+        var setBoard = (board) => {
+            let idx = 0;
+            var cur_buttons = document.getElementsByTagName("button");
+            while(idx < cur_buttons.length){
+                cur_buttons[idx].innerHTML = characters[board[Math.floor(idx/3)][idx%3]];
+                idx += 1;
+            }            
+        }
+
+        var clearBoard = () => {
+            let idx = 0;
+            var cur_buttons = document.getElementsByTagName("button");
+            while(idx < cur_buttons.length){
+                cur_buttons[idx].innerHTML = "O";
+                idx += 1;
+            }   
+        }
+
+        // connection with server
+        socket.on('connect', function () {
+            console.log('Connected to Server');
+        });
+
+        // message listener from server
+        socket.on('newMessage',
+            function (message) {
+                console.log(message);
+            });
+
+        socket.on('SomeoneConnected',(msg)=>{console.log(msg)});
+
+        socket.on('Found',(msg)=>{console.log(msg)});
+
+        socket.on("boardState",(msg)=>{
+            setBoard(msg.board)
+            let txt;
+            if(msg.turn == "yours"){
+                txt = "your turn ";
+            }
+            else{
+                txt = "wait your turn ";
+            }
+            txt += characters[msg.char];
+            document.getElementById("temp").innerHTML = txt;
+        });
+
+        socket.on("winner",(msg)=>{
+            setBoard(msg.board);
+            let txt;
+            if(msg.char == msg.winner){
+                txt = "You Win! ";
+            }
+            else{
+                txt = "You Lose! ";
+            }
+            txt += characters[msg.char]
+            document.getElementById("temp").innerHTML = txt;
+        });
+
+        socket.on("opponentGone",(msg)=>{
+            console.log(msg);
+            clearBoard();
+            document.getElementById("temp").innerHTML = "Opponent has disconnected";
+        })
+ 
+        var clicked = (row,col)=>{
+            socket.emit('playReq',
+                        {
+                            row: row,
+                            col: col
+                        });
+        }
+
+        // when disconnected from server
+        socket.on('disconnect', function () {
+            console.log('Disconnected from server');
+        });
+    </script>
+</body>
+
+</html>
