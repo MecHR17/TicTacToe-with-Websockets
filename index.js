@@ -28,29 +28,36 @@ var endGame = (socket) => {
     if(opponent != undefined){
         delete games[opponent.id];
         delete status.playing[opponent.id];
-        status.waiting.push(opponent);
     }
 }
 
 var checkWin = (board)=>{
     //rows
-    board.forEach(row => {
-        if(!(0 in row)){
-            if(row[0] == row[1] && row[1] == row[2]){
-                return row[0];
+    {
+        let idx = 0;
+        while(idx < 3){
+            let one = board[idx][0];
+            let two = board[idx][1];
+            let three = board[idx][2];
+            if(one != 0 && one == two && two == three){
+                return one;
             }
+            idx += 1;
         }
-    });
+    }
+
     //cols
-    let idx = 0;
-    while(idx < 3){
-        let one = board[0][idx];
-        let two = board[1][idx];
-        let three = board[2][idx];
-        if(one != 0 && one == two && two == three){
-            return one;
+    {
+        let idx = 0;
+        while(idx < 3){
+            let one = board[0][idx];
+            let two = board[1][idx];
+            let three = board[2][idx];
+            if(one != 0 && one == two && two == three){
+                return one;
+            }
+            idx += 1;
         }
-        idx += 1;
     }
     //diagonals
     {
@@ -69,8 +76,54 @@ var checkWin = (board)=>{
             return one;
         }
     }
-    //If no one won
+    //Draw?
+    {
+        let noZero = true;
+        for (let i = 0; i < 3; i++) {
+            for (let k = 0; k < 3; k++) {
+                if (board[i][k] == 0){
+                    noZero = false
+                    break;
+                }
+            }
+            if (!noZero)
+                break;
+        }
+        if(noZero){
+            return -1;
+        }
+    }
+    //If no one won nor drawn
     return 0;
+}
+
+var queue_or_matchup_players = (socket) => {
+    if (status.waiting.length != 0){
+        let opponent = status.waiting.pop();
+        let players = [socket,opponent];
+        let rdm = randomInt(2);
+        let first = players[rdm];
+        let second = players[(rdm+1)%2];
+        let game = {
+            board:[[0,0,0],[0,0,0],[0,0,0]],
+            turn:first.id,
+            next:second.id,
+        };
+        game[first.id] = 1; // X or O
+        game[second.id] = 2;
+        status.playing[socket.id] = opponent;
+        status.playing[opponent.id] = socket;
+        games[socket.id] = game;
+        games[opponent.id] = game;
+        socket.emit('Found',{msg:"Found an opponent!"});
+        opponent.emit('Found',{msg:"Found an opponent!"});
+        first.emit("boardState",{board:game.board,turn:"yours",char:1});
+        second.emit("boardState",{board:game.board,turn:"not yours",char:2});
+    }
+    else{
+        status.waiting.push(socket);
+        socket.emit('Waiting',{msg:"No opponents found. Waiting..."});
+    }
 }
 
 // make connection with user from server side
@@ -79,32 +132,13 @@ io.on('connection',
         console.log('New user connected');
         //emit message from server to user
         
-        if (status.waiting.length != 0){
-            let opponent = status.waiting.pop();
-            let players = [socket,opponent];
-            let rdm = randomInt(2);
-            let first = players[rdm];
-            let second = players[(rdm+1)%2];
-            let game = {
-                board:[[0,0,0],[0,0,0],[0,0,0]],
-                turn:first.id,
-                next:second.id,
-            };
-            game[first.id] = 1; // X or O
-            game[second.id] = 2;
-            status.playing[socket.id] = opponent;
-            status.playing[opponent.id] = socket;
-            games[socket.id] = game;
-            games[opponent.id] = game;
-            socket.emit('Found',{msg:"Found an opponent!"});
-            opponent.emit('Found',{msg:"Found an opponent!"});
-            first.emit("boardState",{board:game.board,turn:"yours",char:1});
-            second.emit("boardState",{board:game.board,turn:"not yours",char:2});
-        }
-        else{
-            status.waiting.push(socket);
-            socket.emit('Waiting',{msg:"No opponents found. Waiting..."});
-        }
+        queue_or_matchup_players(socket);
+
+        socket.on("replay",()=>{
+            if(socket in games || socket in status.waiting)
+                return;
+            queue_or_matchup_players(socket);
+        })
 
         socket.on('playReq',(preq)=>{
             console.log(preq)
@@ -140,12 +174,6 @@ io.on('connection',
             }
         });
 
-        // listen for message from user
-        socket.on('createMessage',
-            (newMessage) => {
-                console.log('newMessage', newMessage);
-            });
-
         // when server disconnects from user
         socket.on('disconnect',
             () => {
@@ -161,7 +189,6 @@ io.on('connection',
                     opponent.emit('opponentGone',{msg:"opponent has disconnected"});
                     delete games[opponent.id];
                     delete status.playing[opponent.id];
-                    status.waiting.push(opponent);
                 }
             });
     });

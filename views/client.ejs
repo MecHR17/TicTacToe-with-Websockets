@@ -4,29 +4,38 @@
 <head>
     <meta charset="utf-8">
     <title>ChatApp</title>
+    <style>
+        button {width: 100px; height: 100px; font-size: larger;}
+        p {font-size: large;}
+        body {background-color: rgb(192, 188, 188);}
+        .replay {width: auto; height: auto; font-size: large;}
+    </style>
 </head>
 
 <body class="chat">
+    <center>
     <table>
         <tr>
-            <td><button onclick="clicked(0,0)">O</button></td>
-            <td><button onclick="clicked(0,1)">O</button></td>
-            <td><button onclick="clicked(0,2)">O</button></td>
+            <td><button onclick="clicked(0,0)" name="boardButton">O</button></td>
+            <td><button onclick="clicked(0,1)" name="boardButton">O</button></td>
+            <td><button onclick="clicked(0,2)" name="boardButton">O</button></td>
         </tr>
         <tr>
-            <td><button onclick="clicked(1,0)">O</button></td>
-            <td><button onclick="clicked(1,1)">O</button></td>
-            <td><button onclick="clicked(1,2)">O</button></td>
+            <td><button onclick="clicked(1,0)" name="boardButton">O</button></td>
+            <td><button onclick="clicked(1,1)" name="boardButton">O</button></td>
+            <td><button onclick="clicked(1,2)" name="boardButton">O</button></td>
         </tr>
         <tr>
-            <td><button onclick="clicked(2,0)">O</button></td>
-            <td><button onclick="clicked(2,1)">O</button></td>
-            <td><button onclick="clicked(2,2)">O</button></td>
+            <td><button onclick="clicked(2,0)" name="boardButton">O</button></td>
+            <td><button onclick="clicked(2,1)" name="boardButton">O</button></td>
+            <td><button onclick="clicked(2,2)" name="boardButton">O</button></td>
         </tr>
     </table>
     <p id="temp">
-
+        Waiting for opponents...
     </p>
+    <button class="replay" hidden="true" id="againButton" onclick="replay()">Play Again?</button>
+    </center>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         var socket = io();
@@ -37,9 +46,14 @@
             2:"O",
         };
 
+        var replay = () => {
+            socket.emit('replay',{});
+            document.getElementById("againButton").hidden = true;
+        }
+
         var setBoard = (board) => {
             let idx = 0;
-            var cur_buttons = document.getElementsByTagName("button");
+            var cur_buttons = document.getElementsByName("boardButton");
             while(idx < cur_buttons.length){
                 cur_buttons[idx].innerHTML = characters[board[Math.floor(idx/3)][idx%3]];
                 idx += 1;
@@ -48,7 +62,7 @@
 
         var clearBoard = () => {
             let idx = 0;
-            var cur_buttons = document.getElementsByTagName("button");
+            var cur_buttons = document.getElementsByName("boardButton");
             while(idx < cur_buttons.length){
                 cur_buttons[idx].innerHTML = "O";
                 idx += 1;
@@ -61,10 +75,11 @@
         });
 
         // message listener from server
-        socket.on('newMessage',
+        socket.on('Waiting',
             function (message) {
-                console.log(message);
-            });
+                document.getElementById("temp").innerHTML = "Waiting for Opponents..."
+            }
+        );
 
         socket.on('SomeoneConnected',(msg)=>{console.log(msg)});
 
@@ -89,17 +104,22 @@
             if(msg.char == msg.winner){
                 txt = "You Win! ";
             }
+            else if(msg.winner == -1){
+                txt = "Draw! ";
+            }
             else{
                 txt = "You Lose! ";
             }
-            txt += characters[msg.char]
+            txt += characters[msg.char];
             document.getElementById("temp").innerHTML = txt;
+            document.getElementById("againButton").hidden = false;
         });
 
         socket.on("opponentGone",(msg)=>{
             console.log(msg);
             clearBoard();
             document.getElementById("temp").innerHTML = "Opponent has disconnected";
+            document.getElementById("againButton").hidden = false;
         })
  
         var clicked = (row,col)=>{
