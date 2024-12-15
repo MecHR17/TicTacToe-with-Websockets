@@ -121,7 +121,7 @@ var queue_or_matchup_players = (socket) => {
         second.emit("boardState",{board:game.board,turn:"not yours",char:2});
     }
     else{
-        status.waiting.push(socket);
+        status.waiting.unshift(socket);
         socket.emit('Waiting',{msg:"No opponents found. Waiting..."});
     }
 }
